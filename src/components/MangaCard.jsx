@@ -1,19 +1,42 @@
 import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Eye, BookOpen, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Eye, BookOpen, Trash2, Lock } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+
+const DELETE_PASSWORD = 'MangaVaultX@2026!'
 
 export default function MangaCard({ manga, onDeleted }) {
   const { id, title, author, genre, cover_url, views, description } = manga
   const [deleting, setDeleting] = useState(false)
+  const [showPrompt, setShowPrompt] = useState(false)
+  const [pwInput, setPwInput] = useState('')
+  const [pwError, setPwError] = useState(false)
 
-  async function handleDelete(e) {
+  function handleDeleteClick(e) {
     e.preventDefault()
     e.stopPropagation()
-    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return
+    setShowPrompt(true)
+    setPwInput('')
+    setPwError(false)
+  }
+
+  async function confirmDelete(e) {
+    e.stopPropagation()
+    if (pwInput !== DELETE_PASSWORD) {
+      setPwError(true)
+      return
+    }
+    setShowPrompt(false)
     setDeleting(true)
     await supabase.from('manga').delete().eq('id', id)
     if (onDeleted) onDeleted(id)
+  }
+
+  function cancelDelete(e) {
+    e.stopPropagation()
+    setShowPrompt(false)
+    setPwInput('')
+    setPwError(false)
   }
 
   return (
@@ -89,7 +112,7 @@ export default function MangaCard({ manga, onDeleted }) {
       </Link>
 
       {/* Delete button */}
-      <button onClick={handleDelete} disabled={deleting} title="Delete manga"
+      <button onClick={handleDeleteClick} disabled={deleting} title="Delete manga"
         style={{
           position:'absolute', top:10, right:10,
           background:'rgba(0,0,0,0.7)', border:'1px solid rgba(220,30,60,0.4)',
@@ -102,6 +125,52 @@ export default function MangaCard({ manga, onDeleted }) {
       >
         <Trash2 size={13} color="white"/>
       </button>
+
+      {/* Password prompt overlay */}
+      {showPrompt && (
+        <div onClick={cancelDelete} style={{
+          position:'fixed', inset:0, background:'rgba(0,0,0,0.75)',
+          display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999,
+        }}>
+          <div onClick={e=>e.stopPropagation()} style={{
+            background:'var(--black-2)', border:'1px solid var(--border-blue)',
+            borderRadius:16, padding:'32px 28px', width:320, textAlign:'center',
+          }}>
+            <Lock size={32} color="var(--red)" style={{ marginBottom:12 }}/>
+            <h3 style={{ fontFamily:'Bebas Neue', fontSize:22, marginBottom:6 }}>DELETE MANGA</h3>
+            <p style={{ color:'var(--white-dim)', fontSize:13, marginBottom:20 }}>
+              Enter the admin password to delete<br/>
+              <strong style={{ color:'var(--white)' }}>"{title}"</strong>
+            </p>
+            <input
+              type="password"
+              value={pwInput}
+              onChange={e=>{ setPwInput(e.target.value); setPwError(false) }}
+              onKeyDown={e=>{ if(e.key==='Enter') confirmDelete(e) }}
+              placeholder="Enter password…"
+              autoFocus
+              style={{
+                width:'100%', boxSizing:'border-box',
+                background:'var(--black-3)', border: pwError ? '1px solid var(--red)' : '1px solid var(--border)',
+                borderRadius:9, padding:'11px 14px', color:'var(--white)', fontSize:15,
+                outline:'none', marginBottom:6,
+              }}
+            />
+            {pwError && <p style={{ color:'var(--red)', fontSize:12, marginBottom:10 }}>❌ Wrong password</p>}
+            <div style={{ display:'flex', gap:10, marginTop:14 }}>
+              <button onClick={cancelDelete} style={{
+                flex:1, padding:'10px', borderRadius:9, fontSize:14, fontWeight:700,
+                background:'var(--black-3)', border:'1px solid var(--border)', color:'var(--white-dim)', cursor:'pointer',
+              }}>Cancel</button>
+              <button onClick={confirmDelete} style={{
+                flex:1, padding:'10px', borderRadius:9, fontSize:14, fontWeight:700,
+                background:'var(--red)', color:'var(--white)', cursor:'pointer',
+                boxShadow:'0 0 12px var(--red-glow)',
+              }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
