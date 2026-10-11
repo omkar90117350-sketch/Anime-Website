@@ -134,7 +134,7 @@ export default function Home() {
             </div>
             {loading ? <Spinner/> : (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(170px,1fr))', gap:20 }}>
-                {popular.map(m => <MangaCard key={m.id} manga={m}/>)}
+                {popular.map(m => <MangaCard key={m.id} manga={m} onDeleted={id=>setPopular(prev=>prev.filter(x=>x.id!==id))}/>)}
               </div>
             )}
           </div>
@@ -160,7 +160,7 @@ export default function Home() {
             </div>
           ) : (
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(170px,1fr))', gap:20 }}>
-              {recent.map(m => <MangaCard key={m.id} manga={m}/>)}
+              {recent.map(m => <MangaCard key={m.id} manga={m} onDeleted={id=>setRecent(prev=>prev.filter(x=>x.id!==id))}/>)}
             </div>
           )}
         </div>
