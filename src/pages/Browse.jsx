@@ -103,7 +103,7 @@ export default function Browse() {
               {query && <> for "<span style={{ color:'var(--blue-light)' }}>{query}</span>"</>}
             </p>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(170px,1fr))', gap:20 }}>
-              {filtered.map(m => <MangaCard key={m.id} manga={m}/>)}
+              {filtered.map(m => <MangaCard key={m.id} manga={m} onDeleted={id=>setManga(prev=>prev.filter(x=>x.id!==id))}/> )}
             </div>
           </>
         )}
