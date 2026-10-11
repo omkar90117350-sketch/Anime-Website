@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Eye, BookOpen, Trash2, Lock } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
-const DELETE_PASSWORD = 'MangaVaultX@2026!'
+const DELETE_PASSWORD = '`&>m!!a^wbo5._f/'
 
 export default function MangaCard({ manga, onDeleted }) {
   const { id, title, author, genre, cover_url, views, description } = manga
