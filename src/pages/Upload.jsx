@@ -1,18 +1,46 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload as UploadIcon, Link as LinkIcon, CheckCircle, AlertCircle } from 'lucide-react'
+import { Upload as UploadIcon, Link as LinkIcon, CheckCircle, AlertCircle, ImagePlus, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 const GENRES = ['Action','Adventure','Comedy','Drama','Fantasy','Horror','Mystery','Romance','Sci-Fi','Slice of Life','Sports','Supernatural','Thriller','Other']
 
 export default function Upload() {
   const navigate = useNavigate()
-  const [form, setForm] = useState({ title:'', author:'', genre:'Action', description:'', pdf_url:'', cover_url:'' })
+  const fileRef = useRef()
+  const [form, setForm] = useState({ title:'', author:'', genre:'Action', description:'', pdf_url:'' })
+  const [coverFile, setCoverFile] = useState(null)
+  const [coverPreview, setCoverPreview] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  function handleCoverPick(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) { setError('Please pick an image file (JPG, PNG, etc.)'); return }
+    if (file.size > 5 * 1024 * 1024) { setError('Image must be under 5 MB'); return }
+    setCoverFile(file)
+    setCoverPreview(URL.createObjectURL(file))
+    setError('')
+  }
+
+  function removeCover() {
+    setCoverFile(null)
+    setCoverPreview('')
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  async function uploadCover(file) {
+    const ext = file.name.split('.').pop()
+    const path = `covers/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const { error: upErr } = await supabase.storage.from('covers').upload(path, file, { contentType: file.type })
+    if (upErr) throw new Error('Cover upload failed: ' + upErr.message)
+    const { data } = supabase.storage.from('covers').getPublicUrl(path)
+    return data.publicUrl
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -21,13 +49,21 @@ export default function Upload() {
     if (!form.pdf_url.startsWith('http')) { setError('Please enter a valid URL starting with http.'); return }
 
     setLoading(true); setError('')
+
+    let cover_url = null
+    try {
+      if (coverFile) cover_url = await uploadCover(coverFile)
+    } catch (err) {
+      setError(err.message); setLoading(false); return
+    }
+
     const { error: err } = await supabase.from('manga').insert([{
       title: form.title.trim(),
       author: form.author.trim() || null,
       genre: form.genre,
       description: form.description.trim() || null,
       pdf_url: form.pdf_url.trim(),
-      cover_url: form.cover_url.trim() || null,
+      cover_url,
       views: 0,
     }])
     setLoading(false)
@@ -53,13 +89,10 @@ export default function Upload() {
           ADD <span style={{ color:'var(--red)' }}>MANGA</span>
         </h1>
         <p style={{ color:'var(--white-dim)', marginBottom:36, lineHeight:1.6 }}>
-          Host your PDF on <strong style={{ color:'var(--blue-light)' }}>Google Drive</strong>, <strong style={{ color:'var(--blue-light)' }}>Archive.org</strong> or any service — then paste the link below. Free, unlimited, forever.
+          Host your PDF on <strong style={{ color:'var(--blue-light)' }}>Google Drive</strong>, <strong style={{ color:'var(--blue-light)' }}>Archive.org</strong> or any service — paste the link below.
         </p>
 
-        <div style={{
-          background:'var(--black-2)', border:'1px solid var(--border-blue)',
-          borderRadius:16, padding:'36px 32px',
-        }}>
+        <div style={{ background:'var(--black-2)', border:'1px solid var(--border-blue)', borderRadius:16, padding:'36px 32px' }}>
           {error && (
             <div style={{
               background:'rgba(220,30,60,0.1)', border:'1px solid var(--red)',
@@ -71,6 +104,44 @@ export default function Upload() {
           )}
 
           <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:20 }}>
+
+            {/* Cover image upload */}
+            <div>
+              <label style={{ fontSize:13, fontWeight:700, color:'var(--blue-light)', letterSpacing:'0.08em', display:'block', marginBottom:8 }}>
+                COVER IMAGE <span style={{ color:'var(--white-dim)', fontWeight:400, textTransform:'none', letterSpacing:0 }}>(optional)</span>
+              </label>
+              {coverPreview ? (
+                <div style={{ position:'relative', display:'inline-block' }}>
+                  <img src={coverPreview} alt="cover preview"
+                    style={{ width:120, height:160, objectFit:'cover', borderRadius:10, border:'2px solid var(--border-blue)', display:'block' }}
+                  />
+                  <button type="button" onClick={removeCover} style={{
+                    position:'absolute', top:-8, right:-8,
+                    background:'var(--red)', borderRadius:'50%', width:24, height:24,
+                    display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer',
+                  }}>
+                    <X size={14} color="white"/>
+                  </button>
+                </div>
+              ) : (
+                <div onClick={()=>fileRef.current?.click()} style={{
+                  width:120, height:160, borderRadius:10,
+                  border:'2px dashed var(--border-blue)', cursor:'pointer',
+                  display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8,
+                  background:'var(--black-3)', transition:'all 0.2s',
+                }}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor='var(--red)'}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor='var(--border-blue)'}
+                >
+                  <ImagePlus size={28} color="var(--blue-light)"/>
+                  <span style={{ color:'var(--white-dim)', fontSize:12, textAlign:'center', lineHeight:1.4 }}>Click to<br/>upload photo</span>
+                </div>
+              )}
+              <input ref={fileRef} type="file" accept="image/*" onChange={handleCoverPick} style={{ display:'none' }}/>
+              <p style={{ color:'var(--white-dim)', fontSize:12, marginTop:6 }}>JPG, PNG, WEBP — max 5 MB</p>
+            </div>
+
+            {/* Title */}
             <div>
               <label style={{ fontSize:13, fontWeight:700, color:'var(--blue-light)', letterSpacing:'0.08em', display:'block', marginBottom:8 }}>
                 MANGA TITLE *
@@ -79,12 +150,14 @@ export default function Upload() {
                 placeholder="e.g. Naruto Vol. 1" required style={inputStyle}/>
             </div>
 
+            {/* Author */}
             <div>
               <label style={labelStyle}>AUTHOR</label>
               <input value={form.author} onChange={e=>set('author',e.target.value)}
                 placeholder="e.g. Masashi Kishimoto" style={inputStyle}/>
             </div>
 
+            {/* Genre */}
             <div>
               <label style={labelStyle}>GENRE</label>
               <select value={form.genre} onChange={e=>set('genre',e.target.value)} style={inputStyle}>
@@ -92,6 +165,7 @@ export default function Upload() {
               </select>
             </div>
 
+            {/* Description */}
             <div>
               <label style={labelStyle}>DESCRIPTION</label>
               <textarea value={form.description} onChange={e=>set('description',e.target.value)}
@@ -99,6 +173,7 @@ export default function Upload() {
                 style={{ ...inputStyle, resize:'vertical', lineHeight:1.6 }}/>
             </div>
 
+            {/* PDF URL */}
             <div>
               <label style={{ fontSize:13, fontWeight:700, color:'var(--red)', letterSpacing:'0.08em', display:'block', marginBottom:8 }}>
                 PDF LINK * <span style={{ color:'var(--white-dim)', fontWeight:400, textTransform:'none', letterSpacing:0 }}>(Google Drive, Archive.org, Dropbox…)</span>
@@ -112,12 +187,6 @@ export default function Upload() {
               <p style={{ color:'var(--white-dim)', fontSize:12, marginTop:6, lineHeight:1.5 }}>
                 For Google Drive: File → Share → "Anyone with the link" → Copy link
               </p>
-            </div>
-
-            <div>
-              <label style={labelStyle}>COVER IMAGE URL <span style={{ color:'var(--white-dim)', fontWeight:400, textTransform:'none', letterSpacing:0 }}>(optional)</span></label>
-              <input value={form.cover_url} onChange={e=>set('cover_url',e.target.value)}
-                placeholder="https://…/cover.jpg" style={inputStyle}/>
             </div>
 
             <button type="submit" disabled={loading} style={{
